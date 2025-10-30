@@ -1,0 +1,39 @@
+{
+  "manifest_version": 2,
+  "name": "OpenMapIt",
+  "version": "1.0.0",
+  "description": "Detect addresses and coordinates on web pages and map them using MapLibre GL",
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png"
+  },
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "storage",
+    "https://nominatim.openstreetmap.org/*"
+  ],
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    },
+    "default_title": "OpenMapIt"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "openmapit@example.com"
+    }
+  }
+}
