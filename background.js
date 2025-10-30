@@ -59,7 +59,7 @@ function parseCoordinates(text) {
   
   // Try various coordinate formats
   // Format 1: 34.0522, -118.2437 or 34.0522,-118.2437
-  let match = text.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+  let match = text.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
   if (match) {
     const lat = parseFloat(match[1]);
     const lon = parseFloat(match[2]);
@@ -69,7 +69,7 @@ function parseCoordinates(text) {
   }
   
   // Format 2: lat: 34.0522, lon: -118.2437 or similar variations
-  match = text.match(/lat(?:itude)?:\s*(-?\d+\.?\d*)\s*,?\s*lon(?:gitude)?:\s*(-?\d+\.?\d*)/i);
+  match = text.match(/lat(?:itude)?:\s*(-?\d+(?:\.\d+)?)\s*,?\s*lon(?:gitude)?:\s*(-?\d+(?:\.\d+)?)/i);
   if (match) {
     const lat = parseFloat(match[1]);
     const lon = parseFloat(match[2]);
@@ -79,7 +79,7 @@ function parseCoordinates(text) {
   }
   
   // Format 3: 34.0522° N, 118.2437° W (DMS style)
-  match = text.match(/(-?\d+\.?\d*)\s*°?\s*([NS])\s*,?\s*(-?\d+\.?\d*)\s*°?\s*([EW])/i);
+  match = text.match(/(-?\d+(?:\.\d+)?)\s*°?\s*([NS])\s*,?\s*(-?\d+(?:\.\d+)?)\s*°?\s*([EW])/i);
   if (match) {
     let lat = parseFloat(match[1]);
     let lon = parseFloat(match[3]);

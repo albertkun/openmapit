@@ -65,7 +65,7 @@ function parseCoordinates(text) {
   text = text.trim();
   
   // Format 1: 34.0522, -118.2437
-  let match = text.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+  let match = text.match(/^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/);
   if (match) {
     const lat = parseFloat(match[1]);
     const lon = parseFloat(match[2]);
@@ -75,7 +75,7 @@ function parseCoordinates(text) {
   }
   
   // Format 2: lat: 34.0522, lon: -118.2437
-  match = text.match(/lat(?:itude)?:\s*(-?\d+\.?\d*)\s*,?\s*lon(?:gitude)?:\s*(-?\d+\.?\d*)/i);
+  match = text.match(/lat(?:itude)?:\s*(-?\d+(?:\.\d+)?)\s*,?\s*lon(?:gitude)?:\s*(-?\d+(?:\.\d+)?)/i);
   if (match) {
     const lat = parseFloat(match[1]);
     const lon = parseFloat(match[2]);
@@ -85,7 +85,7 @@ function parseCoordinates(text) {
   }
   
   // Format 3: 34.0522° N, 118.2437° W
-  match = text.match(/(-?\d+\.?\d*)\s*°?\s*([NS])\s*,?\s*(-?\d+\.?\d*)\s*°?\s*([EW])/i);
+  match = text.match(/(-?\d+(?:\.\d+)?)\s*°?\s*([NS])\s*,?\s*(-?\d+(?:\.\d+)?)\s*°?\s*([EW])/i);
   if (match) {
     let lat = parseFloat(match[1]);
     let lon = parseFloat(match[3]);
@@ -103,6 +103,18 @@ function parseCoordinates(text) {
 
 function isValidCoordinate(lat, lon) {
   return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+}
+
+// Show error message in UI
+function showError(message) {
+  const locationInfo = document.getElementById('location-info');
+  locationInfo.textContent = '⚠️ ' + message;
+  locationInfo.style.color = '#e74c3c';
+  
+  // Reset color after 5 seconds
+  setTimeout(() => {
+    locationInfo.style.color = '#ecf0f1';
+  }, 5000);
 }
 
 // Geocode address using Nominatim
@@ -177,12 +189,12 @@ document.getElementById('search-btn').addEventListener('click', async () => {
           }
         });
       } else {
-        alert('Could not find location. Please try a different address or coordinates.');
+        showError('Could not find location. Please try a different address or coordinates.');
       }
     }
   } catch (error) {
     console.error('Search error:', error);
-    alert('An error occurred while searching. Please try again.');
+    showError('An error occurred while searching. Please try again.');
   } finally {
     searchBtn.disabled = false;
     searchBtn.textContent = 'Map Location';
