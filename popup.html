@@ -2,121 +2,58 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>OpenMapIt</title>
-  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css">
+  <!-- Use local CSS to satisfy extension CSP -->
+  <link rel="stylesheet" href="maplibre-gl.css">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; }
     body {
       font-family: Arial, sans-serif;
-      width: 600px;
-      height: 500px;
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
+      background: #ffffff;
     }
-    
     #header {
       background-color: #2c3e50;
       color: white;
-      padding: 15px;
+      padding: 16px 20px;
       text-align: center;
     }
-    
-    #header h1 {
-      font-size: 20px;
-      margin-bottom: 5px;
-    }
-    
-    #location-info {
-      font-size: 12px;
-      color: #ecf0f1;
-      margin-top: 5px;
-      word-break: break-word;
-    }
-    
-    #map-container {
-      flex: 1;
-      position: relative;
-      background-color: #f0f0f0;
-    }
-    
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-    
-    #no-location {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: #7f8c8d;
-      padding: 20px;
-      text-align: center;
-    }
-    
-    #no-location h2 {
-      font-size: 18px;
-      margin-bottom: 10px;
-    }
-    
-    #no-location p {
-      font-size: 14px;
-      line-height: 1.5;
-    }
-    
-    #input-section {
-      padding: 15px;
-      background-color: #ecf0f1;
-      border-top: 1px solid #bdc3c7;
-    }
-    
-    #location-input {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #bdc3c7;
-      border-radius: 4px;
-      font-size: 14px;
-      margin-bottom: 10px;
-    }
-    
-    #search-btn {
-      width: 100%;
-      padding: 10px;
-      background-color: #3498db;
+    #header h1 { font-size: 22px; margin-bottom: 6px; }
+    #location-info { font-size: 13px; color: #ecf0f1; margin-top: 6px; word-break: break-word; }
+    #map-container { flex: 1; min-height: 0; position: relative; background-color: #f0f0f0; }
+    #map { width: 100%; height: 100%; }
+    #no-location { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #7f8c8d; padding: 20px; text-align: center; }
+    #no-location h2 { font-size: 18px; margin-bottom: 10px; }
+    #no-location p { font-size: 14px; line-height: 1.5; }
+    #input-section { padding: 12px 16px; background-color: #ecf0f1; border-top: 1px solid #bdc3c7; }
+    .input-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; max-width: 1100px; margin: 0 auto; width: 100%; }
+    #location-input { width: 100%; padding: 12px; border: 1px solid #bdc3c7; border-radius: 6px; font-size: 14px; }
+    #search-btn { padding: 12px 16px; background-color: #3498db; color: white; border: none; border-radius: 6px; font-size: 15px; cursor: pointer; transition: background-color 0.3s; }
+    #search-btn:hover { background-color: #2980b9; }
+    #search-btn:disabled { background-color: #95a5a6; cursor: not-allowed; }
+    #gmaps-btn {
+      padding: 12px 16px;
+      background-color: #db4437;
       color: white;
       border: none;
-      border-radius: 4px;
-      font-size: 14px;
+      border-radius: 6px;
+      font-size: 15px;
       cursor: pointer;
       transition: background-color 0.3s;
     }
-    
-    #search-btn:hover {
-      background-color: #2980b9;
-    }
-    
-    #search-btn:disabled {
-      background-color: #95a5a6;
-      cursor: not-allowed;
-    }
-    
-    .loading {
-      color: #3498db;
-      font-style: italic;
-    }
-    
-    @media (max-width: 400px) {
-      body {
-        width: 100vw;
-        height: 100vh;
-      }
+    #gmaps-btn:hover { background-color: #c13527; }
+    #gmaps-btn:disabled { background-color: #95a5a6; cursor: not-allowed; }
+    .loading { color: #3498db; font-style: italic; }
+    /* Responsive */
+    @media (min-width: 900px) { #header h1 { font-size: 24px; } #location-info { font-size: 14px; } }
+    @media (max-width: 600px) {
+      #input-section { padding: 10px 12px; }
+      .input-row { grid-template-columns: 1fr; }
+      #search-btn, #gmaps-btn { width: 100%; }
     }
   </style>
 </head>
@@ -125,7 +62,6 @@
     <h1>🗺️ OpenMapIt</h1>
     <div id="location-info"></div>
   </div>
-  
   <div id="map-container">
     <div id="map"></div>
     <div id="no-location" style="display: none;">
@@ -138,17 +74,15 @@
       </p>
     </div>
   </div>
-  
   <div id="input-section">
-    <input 
-      type="text" 
-      id="location-input" 
-      placeholder="Enter address or coordinates (e.g., 34.0522, -118.2437)"
-    >
-    <button id="search-btn">Map Location</button>
+    <div class="input-row" style="display: grid; grid-template-columns: 1fr auto auto; gap: 10px; max-width: 1100px; margin: 0 auto; width: 100%;">
+      <input type="text" id="location-input" placeholder="Enter address or coordinates (e.g., 34.0522, -118.2437)">
+      <button id="search-btn">Map Location</button>
+      <button id="gmaps-btn" title="Open in Google Maps" disabled>Open in Google Maps</button>
+    </div>
   </div>
-  
-  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+  <!-- Use local JS to satisfy extension CSP -->
+  <script src="maplibre-gl.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

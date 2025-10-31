@@ -1,6 +1,12 @@
 // Background script for context menu handling
 let selectedText = "";
 
+// Helper: open map UI in a new tab
+function openMapView() {
+  const url = browser.runtime.getURL("popup.html");
+  browser.tabs.create({ url });
+}
+
 // Create context menu on installation
 browser.runtime.onInstalled.addListener(() => {
   browser.contextMenus.create({
@@ -19,7 +25,7 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
     const coords = parseCoordinates(selectedText);
     
     if (coords) {
-      // Store coordinates and open popup
+      // Store coordinates and open map in a new tab
       browser.storage.local.set({
         currentLocation: {
           lat: coords.lat,
@@ -28,7 +34,7 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
           type: "coordinates"
         }
       }).then(() => {
-        browser.browserAction.openPopup();
+        openMapView();
       });
     } else {
       // Treat as address and geocode it
@@ -42,7 +48,7 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
               type: "address"
             }
           }).then(() => {
-            browser.browserAction.openPopup();
+            openMapView();
           });
         } else {
           console.error("Could not geocode address:", selectedText);
@@ -99,30 +105,79 @@ function isValidCoordinate(lat, lon) {
   return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
 }
 
-// Geocode address using Nominatim (free OSM geocoding service)
+// Normalize address text (collapse whitespace/newlines)
+function normalizeAddress(address) {
+  if (!address) return "";
+  return address
+    .replace(/[\r\n]+/g, ", ") // newlines to commas
+    .replace(/\s+/g, " ")       // collapse spaces
+    .replace(/,\s*,+/g, ", ")   // fix duplicate commas
+    .trim();
+}
+
+// Geocode address using Nominatim (free OSM geocoding service) with Photon fallback
 async function geocodeAddress(address) {
+  const query = normalizeAddress(address);
+  
+  // Try Nominatim first
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'OpenMapIt Firefox Extension'
+        // Don't set User-Agent (forbidden). Hint JSON response type.
+        'Accept': 'application/json'
       }
     });
-    
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Nominatim HTTP ${response.status}: ${text.slice(0, 160)}`);
+    }
+
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      throw new Error(`Nominatim non-JSON (${contentType}): ${text.slice(0, 160)}`);
+    }
+
     const data = await response.json();
-    
+
     if (data && data.length > 0) {
       return {
         lat: parseFloat(data[0].lat),
         lon: parseFloat(data[0].lon)
       };
     }
-    
-    return null;
   } catch (error) {
-    console.error("Geocoding error:", error);
-    return null;
+    console.warn('Geocoding via Nominatim failed, will try Photon:', error.message || error);
   }
+
+  // Fallback to Photon
+  try {
+    const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`;
+    const response = await fetch(photonUrl, { headers: { 'Accept': 'application/json' } });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Photon HTTP ${response.status}: ${text.slice(0, 160)}`);
+    }
+
+    const data = await response.json();
+    if (data && data.features && data.features.length > 0) {
+      const coords = data.features[0].geometry && data.features[0].geometry.coordinates;
+      if (Array.isArray(coords) && coords.length >= 2) {
+        const lon = parseFloat(coords[0]);
+        const lat = parseFloat(coords[1]);
+        if (isValidCoordinate(lat, lon)) {
+          return { lat, lon };
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Photon geocoding failed:', error.message || error);
+  }
+
+  return null;
 }
 
 // Listen for messages from content script

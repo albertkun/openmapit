@@ -1,12 +1,14 @@
 // Popup script for MapLibre GL map display
 let map = null;
 let currentMarker = null;
+let lastCenter = null;
 
 // Initialize the map
 function initMap(lat, lon, locationText) {
   const mapElement = document.getElementById('map');
   const noLocationElement = document.getElementById('no-location');
   const locationInfoElement = document.getElementById('location-info');
+  const gmapsBtn = document.getElementById('gmaps-btn');
   
   // Show map, hide no-location message
   mapElement.style.display = 'block';
@@ -14,35 +16,95 @@ function initMap(lat, lon, locationText) {
   
   // Update location info
   locationInfoElement.textContent = locationText || `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  lastCenter = { lat, lon, text: locationText };
+  gmapsBtn.disabled = false;
+  gmapsBtn.onclick = () => {
+    const q = encodeURIComponent(locationText || `${lat}, ${lon}`);
+    const url = `https://www.google.com/maps/search/?api=1&query=${q}`;
+    window.open(url, '_blank', 'noopener');
+  };
   
+  const center = [lon, lat];
+
   // Create or update map
   if (!map) {
     map = new maplibregl.Map({
       container: 'map',
-      style: 'https://demotiles.maplibre.org/style.json', // Free MapLibre demo tiles
-      center: [lon, lat],
-      zoom: 13
+      style: 'https://tiles.openfreemap.org/styles/bright',
+      center,
+      zoom: 15.5,
+      pitch: 45,
+      bearing: -17.6,
+      antialias: true
     });
-    
+
     // Add navigation controls
     map.addControl(new maplibregl.NavigationControl(), 'top-right');
-    
     // Add scale control
     map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
+
+    // Add 3D buildings layer on load
+    map.on('load', () => {
+      const style = map.getStyle();
+      const layers = (style && style.layers) || [];
+      let labelLayerId;
+      for (let i = 0; i < layers.length; i++) {
+        const lyr = layers[i];
+        if (lyr.type === 'symbol' && lyr.layout && lyr.layout['text-field']) {
+          labelLayerId = lyr.id;
+          break;
+        }
+      }
+
+      if (!map.getSource('openfreemap')) {
+        map.addSource('openfreemap', {
+          url: 'https://tiles.openfreemap.org/planet',
+          type: 'vector'
+        });
+      }
+
+      if (!map.getLayer('3d-buildings')) {
+        map.addLayer({
+          id: '3d-buildings',
+          source: 'openfreemap',
+          'source-layer': 'building',
+          type: 'fill-extrusion',
+          minzoom: 15,
+          filter: ['!=', ['get', 'hide_3d'], true],
+          paint: {
+            'fill-extrusion-color': [
+              'interpolate', ['linear'], ['get', 'render_height'],
+              0, 'lightgray',
+              200, 'royalblue',
+              400, 'lightblue'
+            ],
+            'fill-extrusion-height': [
+              'interpolate', ['linear'], ['zoom'],
+              15, 0,
+              16, ['get', 'render_height']
+            ],
+            'fill-extrusion-base': [
+              'case',
+              ['>=', ['get', 'zoom'], 16],
+              ['get', 'render_min_height'],
+              0
+            ]
+          }
+        }, labelLayerId);
+      }
+    });
+
   } else {
     // Update existing map
-    map.setCenter([lon, lat]);
-    map.setZoom(13);
+    map.easeTo({ center, zoom: 15.5, pitch: 45, bearing: -17.6, duration: 600 });
   }
   
   // Remove old marker if exists
-  if (currentMarker) {
-    currentMarker.remove();
-  }
+  if (currentMarker) currentMarker.remove();
   
   // Add new marker
   currentMarker = new maplibregl.Marker({ color: '#3498db' })
-    .setLngLat([lon, lat])
+    .setLngLat(center)
     .setPopup(
       new maplibregl.Popup({ offset: 25 })
         .setHTML(`<strong>${locationText || 'Location'}</strong><br>${lat.toFixed(6)}, ${lon.toFixed(6)}`)
@@ -117,18 +179,40 @@ function showError(message) {
   }, 5000);
 }
 
-// Geocode address using Nominatim
+// Normalize address text
+function normalizeAddress(address) {
+  if (!address) return '';
+  return address
+    .replace(/[\r\n]+/g, ', ')
+    .replace(/\s+/g, ' ')
+    .replace(/,\s*,+/g, ', ')
+    .trim();
+}
+
+// Geocode address using Nominatim with Photon fallback
 async function geocodeAddress(address) {
+  const query = normalizeAddress(address);
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'OpenMapIt Firefox Extension'
+        'Accept': 'application/json'
       }
     });
-    
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Nominatim HTTP ${response.status}: ${text.slice(0, 160)}`);
+    }
+
+    const contentType = (response.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.includes('application/json')) {
+      const text = await response.text();
+      throw new Error(`Nominatim non-JSON (${contentType}): ${text.slice(0, 160)}`);
+    }
+
     const data = await response.json();
-    
+
     if (data && data.length > 0) {
       return {
         lat: parseFloat(data[0].lat),
@@ -136,12 +220,38 @@ async function geocodeAddress(address) {
         displayName: data[0].display_name
       };
     }
-    
-    return null;
   } catch (error) {
-    console.error("Geocoding error:", error);
-    return null;
+    console.warn('Geocoding via Nominatim failed, will try Photon:', error.message || error);
   }
+
+  // Photon fallback
+  try {
+    const photonUrl = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`;
+    const response = await fetch(photonUrl, { headers: { 'Accept': 'application/json' } });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Photon HTTP ${response.status}: ${text.slice(0, 160)}`);
+    }
+
+    const data = await response.json();
+    if (data && data.features && data.features.length > 0) {
+      const feature = data.features[0];
+      const coords = feature.geometry && feature.geometry.coordinates;
+      if (Array.isArray(coords) && coords.length >= 2) {
+        const lon = parseFloat(coords[0]);
+        const lat = parseFloat(coords[1]);
+        const name = (feature.properties && (feature.properties.name || feature.properties.street)) || query;
+        if (isValidCoordinate(lat, lon)) {
+          return { lat, lon, displayName: name };
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Photon geocoding failed:', error.message || error);
+  }
+
+  return null;
 }
 
 // Handle search button click
@@ -219,3 +329,10 @@ browser.storage.local.get('currentLocation').then((result) => {
 }).catch(() => {
   showNoLocation();
 });
+
+// After existing listeners, ensure button remains in sync when loading from storage
+(function initGmapsButton() {
+  const gmapsBtn = document.getElementById('gmaps-btn');
+  if (!gmapsBtn) return;
+  gmapsBtn.disabled = true;
+})();
