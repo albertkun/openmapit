@@ -8,7 +8,6 @@ function initMap(lat, lon, locationText) {
   const mapElement = document.getElementById('map');
   const noLocationElement = document.getElementById('no-location');
   const locationInfoElement = document.getElementById('location-info');
-  const gmapsBtn = document.getElementById('gmaps-btn');
   
   // Show map, hide no-location message
   mapElement.style.display = 'block';
@@ -17,12 +16,6 @@ function initMap(lat, lon, locationText) {
   // Update location info
   locationInfoElement.textContent = locationText || `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
   lastCenter = { lat, lon, text: locationText };
-  gmapsBtn.disabled = false;
-  gmapsBtn.onclick = () => {
-    const q = encodeURIComponent(locationText || `${lat}, ${lon}`);
-    const url = `https://www.google.com/maps/search/?api=1&query=${q}`;
-    window.open(url, '_blank', 'noopener');
-  };
   
   const center = [lon, lat];
 
@@ -74,10 +67,13 @@ function initMap(lat, lon, locationText) {
           paint: {
             'fill-extrusion-color': [
               'interpolate', ['linear'], ['get', 'render_height'],
-              0, 'lightgray',
-              200, 'royalblue',
-              400, 'lightblue'
+              0, '#d5d8dc',
+              50, '#c0c4c9',
+              150, '#aab0b6',
+              300, '#959ca3',
+              500, '#7f8890'
             ],
+            'fill-extrusion-opacity': 0.95,
             'fill-extrusion-height': [
               'interpolate', ['linear'], ['zoom'],
               15, 0,
@@ -102,13 +98,26 @@ function initMap(lat, lon, locationText) {
   // Remove old marker if exists
   if (currentMarker) currentMarker.remove();
   
-  // Add new marker
-  currentMarker = new maplibregl.Marker({ color: '#3498db' })
+  // Custom SVG-like circle marker via styled div
+  const markerEl = document.createElement('div');
+  markerEl.className = 'marker-dot';
+  markerEl.setAttribute('title', locationText || 'Location');
+  
+  // Marker popup with Google Maps link
+  const title = locationText || 'Location';
+  const coordsText = `${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+  const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(title || coordsText)}`;
+  const popupHtml = `
+    <div class="popup-title">${escapeHtml(title)}</div>
+    <div class="popup-coords">${coordsText}</div>
+    <div class="popup-actions">
+      <a href="${gmapsUrl}" class="popup-btn" target="_blank" rel="noopener">Open in Google Maps</a>
+    </div>
+  `;
+
+  currentMarker = new maplibregl.Marker({ element: markerEl, anchor: 'bottom' })
     .setLngLat(center)
-    .setPopup(
-      new maplibregl.Popup({ offset: 25 })
-        .setHTML(`<strong>${locationText || 'Location'}</strong><br>${lat.toFixed(6)}, ${lon.toFixed(6)}`)
-    )
+    .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(popupHtml))
     .addTo(map);
   
   // Open popup automatically
@@ -330,9 +339,12 @@ browser.storage.local.get('currentLocation').then((result) => {
   showNoLocation();
 });
 
-// After existing listeners, ensure button remains in sync when loading from storage
-(function initGmapsButton() {
-  const gmapsBtn = document.getElementById('gmaps-btn');
-  if (!gmapsBtn) return;
-  gmapsBtn.disabled = true;
-})();
+// Utility to escape HTML
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
