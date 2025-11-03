@@ -1,7 +1,7 @@
 // Background script for context menu handling
 let selectedText = "";
 
-// Helper: open map UI in a new tab
+// Helper: open map UI in a new tab  
 function openMapView() {
   const url = browser.runtime.getURL("popup.html");
   browser.tabs.create({ url });

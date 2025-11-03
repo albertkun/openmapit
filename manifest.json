@@ -2,30 +2,22 @@
   "manifest_version": 2,
   "name": "OpenMapIt",
   "version": "1.0.0",
-  "description": "Detect addresses and coordinates on web pages and map them using MapLibre GL",
+  "description": "Map addresses and coordinates from web pages. No data collection - just maps locations using OpenStreetMap.",
   "icons": {
     "48": "icons/icon-48.png",
     "96": "icons/icon-96.png"
   },
   "permissions": [
-    "activeTab",
-    "contextMenus",
+    "contextMenus", 
     "storage",
     "tabs",
     "https://nominatim.openstreetmap.org/*",
     "https://photon.komoot.io/*"
   ],
-  "content_security_policy": "default-src 'self'; img-src 'self' data: blob: https://*; connect-src 'self' https://*; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; child-src 'self' blob:; object-src 'self';",
   "background": {
     "scripts": ["background.js"]
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
-  ],
+  "content_security_policy": "default-src 'self'; img-src 'self' data: blob: https://*; connect-src 'self' https://*; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; child-src 'self' blob:; object-src 'self';",
   "browser_action": {
     "default_popup": "popup.html",
     "default_icon": {
